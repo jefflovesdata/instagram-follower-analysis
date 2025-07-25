@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Follower Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for better aesthetics in dark mode */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+        .status-mutual { background-color: #10b981; color: #ffffff; }
+        .status-follows-you { background-color: #3b82f6; color: #ffffff; }
+        .status-not-following-back { background-color: #ef4444; color: #ffffff; }
+        
+        /* Styles for sortable table headers */
+        .sortable { cursor: pointer; position: relative; }
+        .sortable:hover { color: #ffffff; }
+        .sortable::after {
+            content: '▲';
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0;
+            color: #9ca3af;
+            font-size: 0.6rem;
+            transition: opacity 0.2s;
+        }
+        .sortable.asc::after { opacity: 1; }
+        .sortable.desc::after { opacity: 1; content: '▼'; }
+        .sortable:hover::after { opacity: 0.5; }
+        
+        /* Table layout adjustments */
+        table { table-layout: fixed; width: 100%; }
+        th:first-child, td:first-child { width: 35%; }
+        th:nth-child(2), td:nth-child(2) { width: 30%; }
+        th:nth-child(3), td:nth-child(3) { width: 17.5%; }
+        th:last-child, td:last-child { width: 17.5%; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 antialiased">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-white tracking-tight">Instagram Insights</h1>
+            <p class="text-gray-400 mt-2 text-lg">Upload your data to analyze your followers, following & mutuals.</p>
+        </header>
+
+        <!-- Instructions Section -->
+        <div class="max-w-4xl mx-auto bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 mb-8">
+            <h2 class="text-2xl font-semibold text-white mb-4">⚙️ How to Get Your Instagram Data</h2>
+            <div class="text-gray-300 space-y-3">
+                <p>You need to request a copy of your information from Instagram. This is a manual process that can only be done through the app or website.</p>
+                <ol class="list-decimal list-inside space-y-2 pl-4">
+                    <li>➡️ Go to your Instagram profile, then navigate to <strong class="font-semibold">Settings → Accounts Center → Your Information and Permissions</strong>.</li>
+                    <li>➡️ Click <strong class="font-semibold">Download Your Information</strong> and then <a href="https://www.instagram.com/download/request" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline font-semibold">Request a download</a>.</li>
+                    <li>✅ Select your profile and choose <strong class="font-semibold">Select types of information</strong>.</li>
+                    <li>✅ From the options, select only <strong class="font-semibold">Followers and following</strong>.</li>
+                    <li>✅ Set the format to <strong class="font-semibold">JSON</strong> and the date range to <strong class="font-semibold">All time</strong>.</li>
+                    <li>🚀 Finalize the request. Instagram will email you a link to download your data. Unzip the file to find your `followers_1.json` and `following.json` files.</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- File Upload Section -->
+        <div class="max-w-4xl mx-auto bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="followersFile" class="block mb-2 text-sm font-medium text-gray-300">Followers JSON File</label>
+                    <input type="file" id="followersFile" accept=".json" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 transition-colors duration-200"/>
+                </div>
+                <div>
+                    <label for="followingFile" class="block mb-2 text-sm font-medium text-gray-300">Following JSON File</label>
+                    <input type="file" id="followingFile" accept=".json" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 transition-colors duration-200"/>
+                </div>
+            </div>
+            <div class="mt-6 text-center">
+                <button id="processBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full transition-transform duration-200 transform hover:scale-105 shadow-lg">
+                    Analyze Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Analysis Results Section -->
+        <div id="results" class="hidden">
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-center">
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700"><h3 class="text-gray-400 text-sm font-medium">Total Following</h3><p id="followingCount" class="text-2xl font-bold text-white">0</p></div>
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700"><h3 class="text-gray-400 text-sm font-medium">Total Followers</h3><p id="followersCount" class="text-2xl font-bold text-white">0</p></div>
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700"><h3 class="text-gray-400 text-sm font-medium">Mutuals</h3><p id="mutualCount" class="text-2xl font-bold text-green-400">0</p></div>
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700"><h3 class="text-gray-400 text-sm font-medium">Not Following Back</h3><p id="notFollowingBackCount" class="text-2xl font-bold text-red-400">0</p></div>
+            </div>
+
+            <!-- Controls: Filter, Search, and Export -->
+            <div class="bg-gray-800 p-4 rounded-t-lg border-b-2 border-gray-700 space-y-4">
+                <div class="flex flex-col md:flex-row items-center gap-4">
+                    <input type="text" id="searchInput" placeholder="Search by username..." class="w-full md:w-auto md:flex-grow bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="flex flex-wrap gap-2 justify-center">
+                        <button data-filter="all" class="filter-btn bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-semibold">All</button>
+                        <button data-filter="mutual" class="filter-btn bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg text-sm font-semibold">Mutual</button>
+                        <button data-filter="not-following-back" class="filter-btn bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg text-sm font-semibold">Not Following Back</button>
+                        <button data-filter="following-you" class="filter-btn bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg text-sm font-semibold">Following You</button>
+                        <button data-filter="you-follow" class="filter-btn bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg text-sm font-semibold">Following</button>
+                    </div>
+                </div>
+                 <div class="flex flex-wrap gap-2 justify-center items-center pt-4 border-t border-gray-700">
+                    <span class="text-sm font-medium text-gray-300 mr-2">Export current view:</span>
+                    <button id="exportTxt" class="bg-gray-600 hover:bg-gray-500 text-white py-1 px-3 rounded-lg text-xs font-semibold">TXT</button>
+                    <button id="exportCsv" class="bg-gray-600 hover:bg-gray-500 text-white py-1 px-3 rounded-lg text-xs font-semibold">CSV</button>
+                    <button id="exportJson" class="bg-gray-600 hover:bg-gray-500 text-white py-1 px-3 rounded-lg text-xs font-semibold">JSON</button>
+                    <button id="exportHtml" class="bg-gray-600 hover:bg-gray-500 text-white py-1 px-3 rounded-lg text-xs font-semibold">HTML</button>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="overflow-x-auto bg-gray-800 rounded-b-lg shadow-md">
+                <table class="min-w-full divide-y divide-gray-700">
+                    <thead class="bg-gray-700">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider sortable asc" data-sort="username">Username</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider sortable" data-sort="status">Status</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider sortable" data-sort="follower_timestamp">Date They Followed</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider sortable" data-sort="following_timestamp">Date You Followed</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="bg-gray-800 divide-y divide-gray-700"></tbody>
+                </table>
+                 <div id="loading" class="text-center p-8 hidden"><p class="text-lg text-gray-400">Processing your data...</p></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const followersFileInput = document.getElementById('followersFile');
+        const followingFileInput = document.getElementById('followingFile');
+        const processBtn = document.getElementById('processBtn');
+        const resultsDiv = document.getElementById('results');
+        const tableBody = document.getElementById('tableBody');
+        const searchInput = document.getElementById('searchInput');
+        const loadingDiv = document.getElementById('loading');
+        
+        // --- State ---
+        let allUsersData = [];
+        let currentFilter = 'all';
+        let sortState = { column: 'username', direction: 'asc' };
+
+        // --- Event Listeners ---
+        processBtn.addEventListener('click', handleProcessClick);
+        searchInput.addEventListener('input', renderTable);
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('click', handleFilterClick));
+        document.querySelectorAll('.sortable').forEach(header => header.addEventListener('click', handleSortClick));
+        document.getElementById('exportTxt').addEventListener('click', () => exportData('txt'));
+        document.getElementById('exportCsv').addEventListener('click', () => exportData('csv'));
+        document.getElementById('exportJson').addEventListener('click', () => exportData('json'));
+        document.getElementById('exportHtml').addEventListener('click', () => exportData('html'));
+
+        // --- Core Functions ---
+
+        /** Reads a file and parses it as JSON. */
+        function readFileAsJSON(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) return reject(new Error("No file selected."));
+                const reader = new FileReader();
+                reader.onload = e => {
+                    try { resolve(JSON.parse(e.target.result)); } 
+                    catch (err) { reject(new Error("Error parsing JSON file. Make sure it's valid.")); }
+                };
+                reader.onerror = err => reject(err);
+                reader.readAsText(file);
+            });
+        }
+
+        /** Extracts user data from the raw JSON structure. */
+        function extractUserData(data, type) {
+            const list = type === 'followers' ? data : data.relationships_following;
+            if (!Array.isArray(list)) return [];
+            return list.filter(item => item.string_list_data && item.string_list_data[0])
+                       .map(item => ({
+                            username: item.string_list_data[0].value,
+                            href: item.string_list_data[0].href,
+                            timestamp: item.string_list_data[0].timestamp
+                       }));
+        }
+
+        /** Main handler to process uploaded files. */
+        async function handleProcessClick() {
+            if (!followersFileInput.files[0] || !followingFileInput.files[0]) {
+                alert("Please select both followers and following files.");
+                return;
+            }
+            loadingDiv.classList.remove('hidden');
+            tableBody.innerHTML = '';
+            resultsDiv.classList.add('hidden');
+
+            try {
+                const [followersData, followingData] = await Promise.all([
+                    readFileAsJSON(followersFileInput.files[0]),
+                    readFileAsJSON(followingFileInput.files[0])
+                ]);
+                processAndCombineData(followersData, followingData);
+                updateSummaryCards();
+                renderTable();
+                resultsDiv.classList.remove('hidden');
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                loadingDiv.classList.add('hidden');
+            }
+        }
+        
+        /** Combines follower and following data into a single list with status and timestamps. */
+        function processAndCombineData(followersRaw, followingRaw) {
+            const followersList = extractUserData(followersRaw, 'followers');
+            const followingList = extractUserData(followingRaw, 'following');
+            
+            const userMap = new Map();
+
+            // Add all users to a map to get a unique set
+            followersList.forEach(u => userMap.set(u.username, { username: u.username, href: u.href }));
+            followingList.forEach(u => userMap.set(u.username, { username: u.username, href: u.href }));
+
+            const followerMap = new Map(followersList.map(u => [u.username, u]));
+            const followingMap = new Map(followingList.map(u => [u.username, u]));
+
+            allUsersData = Array.from(userMap.values()).map(user => {
+                const isFollower = followerMap.has(user.username);
+                const isFollowing = followingMap.has(user.username);
+                let status = '';
+
+                if (isFollower && isFollowing) status = 'Mutual';
+                else if (isFollower) status = 'Follows You';
+                else if (isFollowing) status = 'Not Following Back';
+
+                return {
+                    ...user,
+                    status: status,
+                    follower_timestamp: isFollower ? followerMap.get(user.username).timestamp : null,
+                    following_timestamp: isFollowing ? followingMap.get(user.username).timestamp : null,
+                };
+            });
+        }
+        
+        /** Updates the summary cards with calculated counts. */
+        function updateSummaryCards() {
+            document.getElementById('followersCount').textContent = allUsersData.filter(u => u.status === 'Mutual' || u.status === 'Follows You').length;
+            document.getElementById('followingCount').textContent = allUsersData.filter(u => u.status === 'Mutual' || u.status === 'Not Following Back').length;
+            document.getElementById('mutualCount').textContent = allUsersData.filter(u => u.status === 'Mutual').length;
+            document.getElementById('notFollowingBackCount').textContent = allUsersData.filter(u => u.status === 'Not Following Back').length;
+        }
+
+        /** Filters, sorts, and gets the data ready for rendering or export. */
+        function getFilteredAndSortedData() {
+            const searchTerm = searchInput.value.toLowerCase();
+            
+            let filteredData = allUsersData;
+            if (currentFilter !== 'all') {
+                 const statusMap = {
+                    'mutual': 'Mutual',
+                    'not-following-back': 'Not Following Back',
+                    'following-you': 'Follows You',
+                    'you-follow': ['Mutual', 'Not Following Back']
+                };
+                const targetStatus = statusMap[currentFilter];
+                if (Array.isArray(targetStatus)) {
+                    filteredData = allUsersData.filter(u => targetStatus.includes(u.status));
+                } else {
+                    filteredData = allUsersData.filter(u => u.status === targetStatus);
+                }
+            }
+
+            const searchResults = filteredData.filter(user => user.username.toLowerCase().includes(searchTerm));
+            
+            searchResults.sort((a, b) => {
+                const valA = a[sortState.column] || 0;
+                const valB = b[sortState.column] || 0;
+                let comparison = 0;
+                if (valA > valB) comparison = 1;
+                else if (valA < valB) comparison = -1;
+                return sortState.direction === 'desc' ? comparison * -1 : comparison;
+            });
+            
+            return searchResults;
+        }
+
+        /** Renders the data into the HTML table. */
+        function renderTable() {
+            const dataToRender = getFilteredAndSortedData();
+            const toDate = ts => ts ? new Date(ts * 1000).toLocaleDateString() : '---';
+
+            tableBody.innerHTML = dataToRender.map(user => {
+                const statusInfo = getStatusInfo(user.status);
+                return `
+                    <tr class="hover:bg-gray-700 transition-colors duration-150">
+                        <td class="px-6 py-4 whitespace-nowrap overflow-hidden text-ellipsis">
+                            <a href="${user.href}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 font-semibold">${user.username}</a>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="status-badge ${statusInfo.class}">${statusInfo.text}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-400">${toDate(user.follower_timestamp)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-400">${toDate(user.following_timestamp)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        /** Returns style info for a given status. */
+        function getStatusInfo(status) {
+            switch (status) {
+                case 'Mutual': return { text: 'Mutual', class: 'status-mutual' };
+                case 'Follows You': return { text: 'Following You', class: 'status-follows-you' };
+                case 'Not Following Back': return { text: 'Not Following Back', class: 'status-not-following-back' };
+                default: return { text: 'Unknown', class: 'bg-gray-500 text-white' };
+            }
+        }
+        
+        /** Handles filter button clicks. */
+        function handleFilterClick(e) {
+            currentFilter = e.target.dataset.filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.replace('bg-blue-600', 'bg-gray-600');
+                btn.classList.add('hover:bg-gray-500');
+            });
+            e.target.classList.replace('bg-gray-600', 'bg-blue-600');
+            e.target.classList.remove('hover:bg-gray-500');
+            renderTable();
+        }
+
+        /** Handles table header clicks for sorting. */
+        function handleSortClick(e) {
+            const column = e.target.dataset.sort;
+            if (sortState.column === column) {
+                sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.column = column;
+                sortState.direction = 'asc';
+            }
+            
+            document.querySelectorAll('.sortable').forEach(h => {
+                h.classList.remove('asc', 'desc');
+                if (h.dataset.sort === sortState.column) {
+                    h.classList.add(sortState.direction);
+                }
+            });
+            renderTable();
+        }
+
+        /** Handles data export to various formats. */
+        function exportData(format) {
+            const data = getFilteredAndSortedData();
+            if (data.length === 0) {
+                alert("No data to export.");
+                return;
+            }
+            const filename = `instagram_analysis_${new Date().toISOString().slice(0,10)}.${format}`;
+            const toDate = ts => ts ? new Date(ts * 1000).toISOString() : '';
+            let content = '';
+            let mimeType = '';
+
+            switch(format) {
+                case 'csv':
+                    content = 'Username,Status,DateTheyFollowed,DateYouFollowed\n';
+                    data.forEach(u => {
+                        content += `${u.username},${u.status},${toDate(u.follower_timestamp)},${toDate(u.following_timestamp)}\n`;
+                    });
+                    mimeType = 'text/csv;charset=utf-8;';
+                    break;
+                case 'txt':
+                    content = data.map(u => {
+                        const fld = u.follower_timestamp ? ` | Follower Since: ${toDate(u.follower_timestamp).slice(0,10)}` : '';
+                        const flg = u.following_timestamp ? ` | Following Since: ${toDate(u.following_timestamp).slice(0,10)}` : '';
+                        return `${u.username} - ${u.status}${fld}${flg}`;
+                    }).join('\n');
+                    mimeType = 'text/plain;charset=utf-8;';
+                    break;
+                case 'json':
+                    content = JSON.stringify(data.map(u => ({...u, follower_date: toDate(u.follower_timestamp), following_date: toDate(u.following_timestamp) })), null, 2);
+                    mimeType = 'application/json;charset=utf-8;';
+                    break;
+                case 'html':
+                    const tableRows = data.map(u => `<tr><td>${u.username}</td><td>${u.status}</td><td>${toDate(u.follower_timestamp).slice(0,10)}</td><td>${toDate(u.following_timestamp).slice(0,10)}</td></tr>`).join('');
+                    content = `<!DOCTYPE html><html><head><title>Instagram Export</title><style>table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}</style></head><body><h1>Instagram Analysis</h1><table><thead><tr><th>Username</th><th>Status</th><th>Date They Followed</th><th>Date You Followed</th></tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+                    mimeType = 'text/html;charset=utf-8;';
+                    break;
+            }
+            
+            const blob = new Blob([content], { type: mimeType });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+
+</body>
+</html>
